@@ -1,0 +1,21 @@
+agua;omeva
+amigo;munu
+amor;olondunge
+boa noite;wete
+boa tarde;ndaya
+bom dia;utanya uwa
+casa;ekulo
+comida;olya
+como estas;ove uli
+como vai;ondaka
+família;ovandu
+feliz;olondunge
+livro;olivro
+não;ka
+obrigado;ndapandula
+ola;wadijo
+saúde;olusuku
+sim;ee
+trabalho;olonjila
+triste;olondunge yove
+água;omema
