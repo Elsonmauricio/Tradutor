@@ -1,19 +1,19 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 
-const Translate = () => {
-  
-  <div className="p-4">
-    <h2 className="text-2xl font-bold mb-2">Tradução</h2>
-    <p>Componente de tradução funcionando!</p>
-  </div>
+// Exemplo de função para traduzir texto
+async function traduzir(texto: string) {
+  const resposta = await axios.post("http://localhost:3002/api/translate", { text: texto });
+  return resposta.data.translation;
+}
 
+const Translate = () => {
   const [input, setInput] = useState('');
   const [translation, setTranslation] = useState('');
 
   const handleTranslate = async () => {
-    const response = await axios.post('http://localhost:5000/api/translate', { text: input });
-    setTranslation(response.data.translation);
+    const translatedText = await traduzir(input);
+    setTranslation(translatedText);
   };
 
   return (

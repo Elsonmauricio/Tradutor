@@ -1,2 +1,21 @@
 saúde=olusuku
 ola amigo como estas ?=wadijo munu [como] [estas] ?
+um
+=[um
+]
+um=mosi
+um=mosi
+eu tenho um amigo=[eu tenho um amigo]
+eu tenho um amigo=[eu tenho um amigo]
+eu tenho um amigo=[eu tenho um amigo]
+eu tenho um amigo=[eu tenho um amigo]
+eu tenho um amigo=[eu tenho um amigo]
+eu tenho um amigo=[eu tenho um amigo]
+amo um amigo=[amo] mosi munu
+bom dia familia=[bom] [dia] [familia]
+bom dia familia
+=[bom] [dia] [familia]
+bom dia familia=[bom] [dia] [familia]
+bom dia familia=[bom] [dia] [familia]
+bom dia família=[bom] [dia] ovandu
+sábado amigo=ocasapalo munu

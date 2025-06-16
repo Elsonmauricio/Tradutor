@@ -1,21 +1,70 @@
-agua;omeva
-amigo;munu
-amor;olondunge
-boa noite;wete
-boa tarde;ndaya
-bom dia;utanya uwa
-casa;ekulo
-comida;olya
-como estas;ove uli
-como vai;ondaka
-família;ovandu
-feliz;olondunge
-livro;olivro
-não;ka
-obrigado;ndapandula
-ola;wadijo
-saúde;olusuku
-sim;ee
-trabalho;olonjila
-triste;olondunge yove
-água;omema
+Aonde=Kupi
+Cobra=Onyõha
+Criança,Filha=Omõla
+Cão=Ombwa
+Eu estou bem=Ame ndikasi ciwa
+Eu não estou bem=Ame sikasi ciwa
+Galinha=Osanji
+Homem=Ulume
+Joelho=Ongolo
+Me desculpa=Ngecele
+Nós não estamos bem=Etu katukasi ciwa
+O meu nome é=Onduko yange Ame
+O que é=Nye
+Obrigado=Ndapandula
+Oi, olá, bom dia, boa tarde ou boa noite=kalungi ´usa-se no plural para comprimentar ou saudar duas ou mais pessoas´ 
+Onde=Pi
+Pastor=Ungombo
+Piedade,Pena=Ohenda
+Qual é o seu nome=Onduko yove elye
+Quem=Helye
+Taxista=Sayaywisungende
+Táxi=Eyaywisungende
+Vais=Wenda
+Vergonha=Osõyi
+Visita=Ukombe
+ajuda-me=Ngwatise
+amigo=munu
+amor=olondunge
+boa noite=wete
+boa tarde=ndaya
+bom dia=utanya uwa
+casa=ekulo
+cinco=talõ
+comida=olya
+como esta?=Ndati Okasi?
+como estão=Ndati ukusi?
+como vai=ondaka
+dez=ekwi
+dois=vali
+domingo=ocalumingu
+eu=Ame
+família=ovandu
+feliz=olondunge
+jovem,Moço=Ukwenje
+joven,Moça=Ufeko
+medo=Usumba
+nove=eceya
+não=ka
+obrigado=ndapandula
+oito=ecelãla
+ola, oi=kalunga
+preciso da tua ajuda=Ndisukila ekwastiso ly'ove
+quarta-feira=okwãla
+quatro=kwãla
+quinta-feira=otãlo
+saúde=olusuku
+segunda-feira=ovali
+seis=espandu
+sete=epanduvali
+sexta-feira=osesa ou ocasesa
+sim=ee
+sábado=ocasapalo
+terça-feira=otatu
+trabalho=olonjila
+triste=olondunge yove
+três=tatu
+um=mosi
+É como=Ndati
+à quem=Kulye
+água=omema
