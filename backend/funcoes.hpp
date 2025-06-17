@@ -12,7 +12,12 @@
 #include <limits>
 #include <stdexcept>
 
+#include "sqlite3.h"
+
 #include <cctype>
+
+// Conexão global com o banco de dados
+extern sqlite3* db;
 
 using namespace std;
 
@@ -24,7 +29,7 @@ struct Config {
     bool traduzir_inverso = false;
 };
 
-// Constantes de arquivos
+ // Constantes de arquivos
 const std::string DICIONARIO_ARQUIVO = "./dicionario.txt";
 const std::string HISTORICO_ARQUIVO = "./historico.txt";
 const std::string FAVORITOS_ARQUIVO = "./favoritos.txt";
@@ -34,6 +39,11 @@ std::string aplicarCor(const std::string& texto, const std::string& cor);
 std::string toLowerCase(const std::string& str);
 std::vector<std::string> splitFrase(const std::string& frase);
 bool contemUTF8(const std::string& str);
+
+// Funções modificadas para usar SQLite
+void salvarHistorico(const std::string& entrada, const std::string& traducao);
+std::vector<std::string> carregarHistorico();
+void limparHistorico();
 
 // Carregamento e salvamento
 Config carregarConfiguracoes();
@@ -71,6 +81,13 @@ void adicionarAFavoritos(const std::string& traducao);
 
 // Estatísticas
 void mostrarEstatisticas(const std::map<std::string, std::string>& dicionario, const std::vector<std::string>& historico);
+
+void inicializarBancoDados();
+void fecharBancoDados();
+
+// Adicione estas declarações
+
+bool executarSQL(const char* sql, int (*callback)(void*, int, char**, char**) = nullptr, void* data = nullptr);
 
 std::string toLowerCase(const std::string& str);
 #endif

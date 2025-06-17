@@ -9,6 +9,7 @@
 #include <map>
 
 #include "funcoes.hpp"
+#include "sqlite3.h" 
 #include "json.hpp"
 
 #ifdef NLOHMANN_JSON_ABI_TAG
@@ -24,6 +25,9 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <sqlite3.h>
+#include <locale.h>
+#include <windows.h> // Para GetCurrentDirectory no Windows
 
 #ifdef _WIN32
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
@@ -33,13 +37,44 @@
 using namespace std;
 
 int main() {
+    setlocale(LC_ALL, "Portuguese");
+
+     // Verifica o diretório atual
+   char buffer[MAX_PATH];
+GetCurrentDirectory(MAX_PATH, buffer);
+std::cout << "Diretório atual: " << buffer << std::endl;
+   
+// Inicializa o banco de dados
+inicializarBancoDados();
+    
+    
+    Config config = carregarConfiguracoes();
+    map<string, string> dicionario = carregarDicionario(config.traduzir_inverso);
+    
+    if (dicionario.empty()) {
+        std::cerr << "Dicionário vazio - inserindo dados iniciais..." << std::endl;
+        const char* inserts[] = {
+            "INSERT INTO dicionario (portugues, umbundo) VALUES ('ola', 'hello');",
+            "INSERT INTO dicionario (portugues, umbundo) VALUES ('mundo', 'world');",
+            nullptr
+        };
+        
+        for (int i = 0; inserts[i]; i++) {
+            char* errMsg = nullptr;
+            if (sqlite3_exec(db, inserts[i], nullptr, nullptr, &errMsg) != SQLITE_OK) {
+                std::cerr << "Erro ao inserir: " << errMsg << std::endl;
+                sqlite3_free(errMsg);
+            }
+        }
+        
+        dicionario = carregarDicionario(config.traduzir_inverso);
+    }
+
     // Define o locale global para "C"
     locale::global(locale("C"));
     
 
     // Carrega configurações e dicionário
-    Config config = carregarConfiguracoes();
-    map<string, string> dicionario = carregarDicionario(config.traduzir_inverso);
     vector<string> historico = carregarHistorico();
 
     // Verifica se o dicionário foi carregado corretamente
@@ -311,6 +346,6 @@ svr.Delete("/api/history/entry", [&](const httplib::Request& req, httplib::Respo
     //         default: cout << aplicarCor("Opção inválida!", "vermelho") << endl;
     //     }
     // }
-
+        fecharBancoDados();
         return 0;  
 }  

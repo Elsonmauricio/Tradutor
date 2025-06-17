@@ -4,6 +4,8 @@
 #include <iostream>
 #include <algorithm>
 #include <cctype>
+#include <ctime>
+#include <windows.h> // Para GetCurrentDirectory e MAX_PATH
 
 using namespace std;
 
@@ -18,38 +20,136 @@ string toLowerCase(const string& str) {
     return result;
 }
 
+// Definição da conexão global
+sqlite3* db = nullptr;
+
+void inicializarBancoDados() {
+    // Verifica o diretório atual
+    char path[MAX_PATH];
+    GetCurrentDirectoryA(MAX_PATH, path); // Usamos a versão ANSI (GetCurrentDirectoryA)
+    std::cout << "Diretório atual: " << path << std::endl;
+
+    // Abre o banco de dados
+    int rc = sqlite3_open("tradutor.db", &db);
+    if (rc != SQLITE_OK) {
+        std::cerr << "Erro SQLite: " << sqlite3_errmsg(db) << std::endl;
+        exit(1);
+    }
+
+    // Cria todas as tabelas necessárias
+    const char* sql = 
+        "CREATE TABLE IF NOT EXISTS dicionario ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "portugues TEXT NOT NULL UNIQUE,"
+        "umbundo TEXT NOT NULL);"
+        
+        "CREATE TABLE IF NOT EXISTS historico ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "entrada TEXT NOT NULL,"
+        "traducao TEXT NOT NULL,"
+        "data TIMESTAMP DEFAULT CURRENT_TIMESTAMP);"
+        
+        "CREATE TABLE IF NOT EXISTS favoritos ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "entrada TEXT NOT NULL,"
+        "traducao TEXT NOT NULL);";
+        
+    char* errMsg = nullptr;
+    rc = sqlite3_exec(db, sql, nullptr, nullptr, &errMsg);
+    if (rc != SQLITE_OK) {
+        std::cerr << "Erro ao criar tabelas: " << errMsg << std::endl;
+        sqlite3_free(errMsg);
+    }
+}
+// Função para executar consultas SQL
+bool executarSQL(const char* sql, int (*callback)(void*, int, char**, char**), void* data) {
+    if (!db) return false;
+    
+    char* errMsg = nullptr;
+    int rc = sqlite3_exec(db, sql, callback, data, &errMsg);
+    
+    if (rc != SQLITE_OK) {
+        cerr << "Erro SQL: " << errMsg << endl;
+        sqlite3_free(errMsg);
+        return false;
+    }
+    return true;
+}
+
+
+
+// map<std::string, std::string> carregarDicionario(bool inverso) {
+//     map<std::string, std::string> dicionario;
+//     ifstream arquivo("dicionario.txt");  // Use nome fixo para teste
+    
+//     // Adicione logs
+//     if (!arquivo.is_open()) {
+//         cerr << "Erro: Não foi possível abrir dicionario.txt" << endl;
+//         return dicionario;
+//     }
+
+//     std::string linha;
+//     int count = 0;
+//     while (getline(arquivo, linha)) {
+//         size_t pos = linha.find('=');
+//         if (pos != std::string::npos) {
+//             std::string chave = linha.substr(0, pos);
+//             std::string valor = linha.substr(pos + 1);
+            
+//             // Adicione log
+//             cout << "Carregando: " << chave << " -> " << valor << endl;
+            
+//             if (inverso)
+//                 dicionario[valor] = chave;
+//             else
+//                 dicionario[chave] = valor;
+                
+//             count++;
+//         }
+//     }
+//     cout << "Total de palavras carregadas: " << count << endl;
+//     return dicionario;
+// }
+
 map<std::string, std::string> carregarDicionario(bool inverso) {
     map<std::string, std::string> dicionario;
-    ifstream arquivo("dicionario.txt");  // Use nome fixo para teste
     
-    // Adicione logs
-    if (!arquivo.is_open()) {
-        cerr << "Erro: Não foi possível abrir dicionario.txt" << endl;
+    if (!db) {
+        cerr << "Erro: Conexão com o banco de dados não inicializada!" << endl;
         return dicionario;
     }
 
-    std::string linha;
+    cout << "Iniciando carregamento do dicionário..." << endl;
+
+    const char* sql = "SELECT portugues, umbundo FROM dicionario;";
+    sqlite3_stmt* stmt;
+    
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+        cerr << "Erro ao preparar consulta: " << sqlite3_errmsg(db) << endl;
+        return dicionario;
+    }
+    
     int count = 0;
-    while (getline(arquivo, linha)) {
-        size_t pos = linha.find('=');
-        if (pos != std::string::npos) {
-            std::string chave = linha.substr(0, pos);
-            std::string valor = linha.substr(pos + 1);
-            
-            // Adicione log
-            cout << "Carregando: " << chave << " -> " << valor << endl;
-            
-            if (inverso)
-                dicionario[valor] = chave;
-            else
-                dicionario[chave] = valor;
-                
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        const char* portugues = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
+        const char* umbundo = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+        
+        if (portugues && umbundo) {
+            if (inverso) {
+                dicionario[umbundo] = portugues;
+            } else {
+                dicionario[portugues] = umbundo;
+            }
             count++;
         }
     }
+    
     cout << "Total de palavras carregadas: " << count << endl;
+    
+    sqlite3_finalize(stmt);
     return dicionario;
 }
+
 
 void adicionarNovaTraducao(std::map<std::string, std::string>& dicionario, const std::string& portugues, const std::string& umbundo) {
     try {
@@ -57,27 +157,43 @@ void adicionarNovaTraducao(std::map<std::string, std::string>& dicionario, const
         string cleanPt = portugues;
         string cleanUm = umbundo;
         
-        if (cleanPt.front() == '[' && cleanPt.back() == ']') {
-            cleanPt = cleanPt.substr(1, cleanPt.length() - 2);
-        }
-        if (cleanUm.front() == '[' && cleanUm.back() == ']') {
-            cleanUm = cleanUm.substr(1, cleanUm.length() - 2);
-        }
+    //     if (cleanPt.front() == '[' && cleanPt.back() == ']') {
+    //         cleanPt = cleanPt.substr(1, cleanPt.length() - 2);
+    //     }
+    //     if (cleanUm.front() == '[' && cleanUm.back() == ']') {
+    //         cleanUm = cleanUm.substr(1, cleanUm.length() - 2);
+    //     }
 
-        // Verificar se já existe
-        if (dicionario.find(cleanPt) != dicionario.end()) {
-            throw runtime_error("Tradução já existe no dicionário");
-        }
+    //     // Verificar se já existe
+    //     if (dicionario.find(cleanPt) != dicionario.end()) {
+    //         throw runtime_error("Tradução já existe no dicionário");
+    //     }
 
-        // Adicionar ao dicionário e arquivo
+    //     // Adicionar ao dicionário e arquivo
+    //     dicionario[cleanPt] = cleanUm;
+    //     ofstream arquivo(DICIONARIO_ARQUIVO, ios::app);
+    //     if (!arquivo) {
+    //         throw runtime_error("Falha ao abrir arquivo do dicionário");
+    //     }
+    //     arquivo << cleanPt << "=" << cleanUm << "\n";
+    //     arquivo.close();
+
+    //     cout << aplicarCor("Tradução adicionada com sucesso!\n", "verde");
+    // }
+    // catch (const exception& e) {
+    //     cerr << aplicarCor("Erro ao adicionar: " + string(e.what()) + "\n", "vermelho");
+    // }
+
+      // Inserir no banco de dados
+        string sql = "INSERT INTO dicionario (portugues, umbundo) VALUES ('" + 
+                     cleanPt + "', '" + cleanUm + "');";
+        
+        if (!executarSQL(sql.c_str(), nullptr, nullptr)) {
+            throw runtime_error("Falha ao inserir no banco de dados");
+        }
+        
+        // Atualizar dicionário em memória
         dicionario[cleanPt] = cleanUm;
-        ofstream arquivo(DICIONARIO_ARQUIVO, ios::app);
-        if (!arquivo) {
-            throw runtime_error("Falha ao abrir arquivo do dicionário");
-        }
-        arquivo << cleanPt << "=" << cleanUm << "\n";
-        arquivo.close();
-
         cout << aplicarCor("Tradução adicionada com sucesso!\n", "verde");
     }
     catch (const exception& e) {
@@ -85,217 +201,255 @@ void adicionarNovaTraducao(std::map<std::string, std::string>& dicionario, const
     }
 }
 
+
 // Implementações básicas das funções restantes (como placeholders)
-void processarTraducao(Config& config, std::map<std::string, std::string>& dicionario) {
-    try {
-        cout << "\n" << aplicarCor("=== Modo de Tradução ===", config.cor_principal) << endl;
-        cout << "1. Palavra única\n2. Frase completa\n3. Voltar\n";
-        cout << "Escolha o tipo: ";
+// void processarTraducao(Config& config, std::map<std::string, std::string>& dicionario) {
+//     try {
+//         cout << "\n" << aplicarCor("=== Modo de Tradução ===", config.cor_principal) << endl;
+//         cout << "1. Palavra única\n2. Frase completa\n3. Voltar\n";
+//         cout << "Escolha o tipo: ";
         
-        int tipo;
-        cin >> tipo;
-        cin.ignore();
+//         int tipo;
+//         cin >> tipo;
+//         cin.ignore();
         
-        if (tipo == 3) return;
+//         if (tipo == 3) return;
 
-        if (tipo != 1 && tipo != 2) {
-            throw invalid_argument("Tipo de tradução inválido");
-        }
+//         if (tipo != 1 && tipo != 2) {
+//             throw invalid_argument("Tipo de tradução inválido");
+//         }
 
-        cout << (tipo == 1 ? "Digite a palavra: " : "Digite a frase: ");
-        string entrada;
-        getline(cin, entrada);
+//         cout << (tipo == 1 ? "Digite a palavra: " : "Digite a frase: ");
+//         string entrada;
+//         getline(cin, entrada);
 
-        if (entrada.empty()) {
-            throw runtime_error("Entrada vazia");
-        }
+//         if (entrada.empty()) {
+//             throw runtime_error("Entrada vazia");
+//         }
 
-        string traducao = traduzirTexto(entrada, dicionario, tipo == 2);
+//         string traducao = traduzirTexto(entrada, dicionario, tipo == 2);
         
-        cout << "\n" << aplicarCor("Resultado:", "verde") << "\n";
-        cout << aplicarCor(entrada, config.cor_principal) << " → " 
-             << aplicarCor(traducao, "ciano") << "\n\n";
+//         cout << "\n" << aplicarCor("Resultado:", "verde") << "\n";
+//         cout << aplicarCor(entrada, config.cor_principal) << " → " 
+//              << aplicarCor(traducao, "ciano") << "\n\n";
 
-        if (config.salvar_historico) {
-            salvarLista(HISTORICO_ARQUIVO, {entrada + "=" + traducao});
+//         if (config.salvar_historico) {
+//             salvarLista(HISTORICO_ARQUIVO, {entrada + "=" + traducao});
             
-            if (config.mostrar_dicas) {
-                cout << aplicarCor("Dica: Esta tradução foi salva no histórico.\n", "amarelo");
-            }
-        }
+//             if (config.mostrar_dicas) {
+//                 cout << aplicarCor("Dica: Esta tradução foi salva no histórico.\n", "amarelo");
+//             }
+//         }
 
-        // Sugerir adicionar ao dicionário se não encontrado
-        if (traducao.find("[") != string::npos) {
-            cout << aplicarCor("Deseja adicionar ao dicionário? (s/n): ", "amarelo");
-            char resposta;
-            cin >> resposta;
-            if (tolower(resposta) == 's') {
-                adicionarNovaTraducao(dicionario, entrada, traducao);
-            }
-        }
-    } 
-    catch (const exception& e) {
-        cerr << aplicarCor("\nErro: " + string(e.what()) + "\n", "vermelho");
-    }
-}
+//         // Sugerir adicionar ao dicionário se não encontrado
+//         if (traducao.find("[") != string::npos) {
+//             cout << aplicarCor("Deseja adicionar ao dicionário? (s/n): ", "amarelo");
+//             char resposta;
+//             cin >> resposta;
+//             if (tolower(resposta) == 's') {
+//                 adicionarNovaTraducao(dicionario, entrada, traducao);
+//             }
+//         }
+//     } 
+//     catch (const exception& e) {
+//         cerr << aplicarCor("\nErro: " + string(e.what()) + "\n", "vermelho");
+//     }
+// }
 
 
-void gerenciarDicionario() {
-    try {
-        map<string, string> dicionario = carregarDicionario();
-        int opcao;
+// void gerenciarDicionario() {
+//     try {
+//         map<string, string> dicionario = carregarDicionario();
+//         int opcao;
         
-        do {
-            cout << "\n=== Gerenciar Dicionário ===\n";
-            cout << "1. Listar todas as traduções\n";
-            cout << "2. Adicionar nova tradução\n";
-            cout << "3. Remover tradução\n";
-            cout << "4. Buscar tradução\n";
-            cout << "5. Voltar\n";
-            cout << "Escolha: ";
+//         do {
+//             cout << "\n=== Gerenciar Dicionário ===\n";
+//             cout << "1. Listar todas as traduções\n";
+//             cout << "2. Adicionar nova tradução\n";
+//             cout << "3. Remover tradução\n";
+//             cout << "4. Buscar tradução\n";
+//             cout << "5. Voltar\n";
+//             cout << "Escolha: ";
             
-            cin >> opcao;
-            cin.ignore();
+//             cin >> opcao;
+//             cin.ignore();
             
-            switch(opcao) {
-                case 1: {
-                    cout << "\n=== Traduções ===\n";
-                    for (const auto& par : dicionario) {
-                        cout << setw(20) << left << par.first << " → " << par.second << "\n";
-                    }
-                    break;
-                }
-                case 2: {
-                    string pt, um;
-                    cout << "Português: ";
-                    getline(cin, pt);
-                    cout << "Umbundo: ";
-                    getline(cin, um);
+//             switch(opcao) {
+//                 case 1: {
+//                     cout << "\n=== Traduções ===\n";
+//                     for (const auto& par : dicionario) {
+//                         cout << setw(20) << left << par.first << " → " << par.second << "\n";
+//                     }
+//                     break;
+//                 }
+//                 case 2: {
+//                     string pt, um;
+//                     cout << "Português: ";
+//                     getline(cin, pt);
+//                     cout << "Umbundo: ";
+//                     getline(cin, um);
 
-                    if (pt.empty() || um.empty()) {
-                        throw invalid_argument("Entradas não podem ser vazias");
-                    }
+//                     if (pt.empty() || um.empty()) {
+//                         throw invalid_argument("Entradas não podem ser vazias");
+//                     }
 
-                    adicionarNovaTraducao(dicionario, pt, um);
-                    break;
-                }
-                case 3: {
-                    string pt;
-                    cout << "Palavra em Português para remover: ";
-                    getline(cin, pt);
+//                     adicionarNovaTraducao(dicionario, pt, um);
+//                     break;
+//                 }
+//                 case 3: {
+//                     string pt;
+//                     cout << "Palavra em Português para remover: ";
+//                     getline(cin, pt);
                     
-                    auto it = dicionario.find(toLowerCase(pt));
-                    if (it != dicionario.end()) {
-                        dicionario.erase(it);
-                        salvarDicionario(dicionario);
-                        cout << "Tradução removida.\n";
-                    } else {
-                        cout << "Tradução não encontrada.\n";
-                    }
-                    break;
-                }
-                case 4: {
-                    string termo;
-                    cout << "Termo para buscar: ";
-                    getline(cin, termo);
+//                     auto it = dicionario.find(toLowerCase(pt));
+//                     if (it != dicionario.end()) {
+//                         dicionario.erase(it);
+//                         salvarDicionario(dicionario);
+//                         cout << "Tradução removida.\n";
+//                     } else {
+//                         cout << "Tradução não encontrada.\n";
+//                     }
+//                     break;
+//                 }
+//                 case 4: {
+//                     string termo;
+//                     cout << "Termo para buscar: ";
+//                     getline(cin, termo);
                     
-                    cout << "\nResultados:\n";
-                    bool encontrado = false;
-                    for (const auto& par : dicionario) {
-                        if (par.first.find(toLowerCase(termo)) != string::npos || 
-                            par.second.find(toLowerCase(termo)) != string::npos) {
-                            cout << setw(20) << left << par.first << " → " << par.second << "\n";
-                            encontrado = true;
-                        }
-                    }
+//                     cout << "\nResultados:\n";
+//                     bool encontrado = false;
+//                     for (const auto& par : dicionario) {
+//                         if (par.first.find(toLowerCase(termo)) != string::npos || 
+//                             par.second.find(toLowerCase(termo)) != string::npos) {
+//                             cout << setw(20) << left << par.first << " → " << par.second << "\n";
+//                             encontrado = true;
+//                         }
+//                     }
                     
-                    if (!encontrado) {
-                        cout << "Nenhum resultado encontrado.\n";
-                    }
-                    break;
-                }
-                case 5:
-                    break;
-                default:
-                    cout << "Opção inválida.\n";
-            }
-        } while (opcao != 5);
-    }
-    catch (const exception& e) {
-        cerr << aplicarCor("Erro no gerenciamento: " + string(e.what()) + "\n", "vermelho");
-    }
+//                     if (!encontrado) {
+//                         cout << "Nenhum resultado encontrado.\n";
+//                     }
+//                     break;
+//                 }
+//                 case 5:
+//                     break;
+//                 default:
+//                     cout << "Opção inválida.\n";
+//             }
+//         } while (opcao != 5);
+//     }
+//     catch (const exception& e) {
+//         cerr << aplicarCor("Erro no gerenciamento: " + string(e.what()) + "\n", "vermelho");
+//     }
+// }
+
+// vector<string> carregarHistorico() {
+//     vector<string> historico;
+//     ifstream arquivo(HISTORICO_ARQUIVO);
+//     string linha;
+//     while (getline(arquivo, linha)) {
+//         if (!linha.empty()) {
+//             historico.push_back(linha);
+//         }
+//     }
+//     return historico;
+// }
+
+// void salvarHistorico(const string& entrada, const string& traducao) {
+//     ofstream arquivo(HISTORICO_ARQUIVO, ios::app);
+//     if (arquivo.is_open()) {
+//         arquivo << entrada << "=" << traducao << "\n";
+//         arquivo.close();
+//     } else {
+//         cerr << "Erro ao salvar histórico." << endl;
+//     }
+// }
+
+void salvarHistorico(const string& entrada, const string& traducao) {
+    if (!db) return;
+    
+    string sql = "INSERT INTO historico (entrada, traducao) VALUES ('" + 
+                 entrada + "', '" + traducao + "');";
+    executarSQL(sql.c_str(), nullptr, nullptr);
 }
 
 vector<string> carregarHistorico() {
     vector<string> historico;
-    ifstream arquivo(HISTORICO_ARQUIVO);
-    string linha;
-    while (getline(arquivo, linha)) {
-        if (!linha.empty()) {
-            historico.push_back(linha);
-        }
+    if (!db) return historico;
+
+    const char* sql = "SELECT entrada, traducao FROM historico ORDER BY data DESC;";
+    sqlite3_stmt* stmt;
+    
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+        cerr << "Erro ao preparar consulta: " << sqlite3_errmsg(db) << endl;
+        return historico;
     }
+    
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        const char* entrada = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
+        const char* traducao = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+        historico.push_back(string(entrada) + "=" + string(traducao));
+    }
+    
+    sqlite3_finalize(stmt);
     return historico;
 }
 
-void salvarHistorico(const string& entrada, const string& traducao) {
-    ofstream arquivo(HISTORICO_ARQUIVO, ios::app);
-    if (arquivo.is_open()) {
-        arquivo << entrada << "=" << traducao << "\n";
-        arquivo.close();
-    } else {
-        cerr << "Erro ao salvar histórico." << endl;
-    }
+void limparHistorico() {
+    if (!db) return;
+    
+   executarSQL("DELETE FROM historico;", nullptr, nullptr);
+    cout << aplicarCor("Histórico limpo com sucesso!\n", "verde");
 }
 
-void gerenciarFavoritos() {
-    vector<string> favoritos = carregarLista(FAVORITOS_ARQUIVO);
-    int opcao;
+// void gerenciarFavoritos() {
+//     vector<string> favoritos = carregarLista(FAVORITOS_ARQUIVO);
+//     int opcao;
     
-    do {
-        cout << "\n=== Gerenciar Favoritos ===\n";
-        cout << "1. Listar favoritos\n";
-        cout << "2. Adicionar a favoritos\n";
-        cout << "3. Remover de favoritos\n";
-        cout << "4. Voltar\n";
-        cout << "Escolha: ";
+//     do {
+//         cout << "\n=== Gerenciar Favoritos ===\n";
+//         cout << "1. Listar favoritos\n";
+//         cout << "2. Adicionar a favoritos\n";
+//         cout << "3. Remover de favoritos\n";
+//         cout << "4. Voltar\n";
+//         cout << "Escolha: ";
         
-        cin >> opcao;
-        cin.ignore();
+//         cin >> opcao;
+//         cin.ignore();
         
-        switch(opcao) {
-            case 1:
-                mostrarFavoritos();
-                break;
-            case 2: {
-                string traducao;
-                cout << "Digite a tradução para adicionar aos favoritos: ";
-                getline(cin, traducao);
-                adicionarAFavoritos(traducao);
-                break;
-            }
-            case 3: {
-                mostrarFavoritos();
-                cout << "Digite o número do favorito para remover: ";
-                int idx;
-                cin >> idx;
-                cin.ignore();
-                if (idx > 0 && idx <= favoritos.size()) {
-                    favoritos.erase(favoritos.begin() + idx - 1);
-                    salvarLista(FAVORITOS_ARQUIVO, favoritos);
-                    cout << aplicarCor("Favorito removido!\n", "verde");
-                } else {
-                    cout << "Índice inválido.\n";
-                }
-                break;
-            }
-            case 4:
-                break;
-            default:
-                cout << "Opção inválida.\n";
-        }
-    } while (opcao != 4);
-}
+//         switch(opcao) {
+//             case 1:
+//                 mostrarFavoritos();
+//                 break;
+//             case 2: {
+//                 string traducao;
+//                 cout << "Digite a tradução para adicionar aos favoritos: ";
+//                 getline(cin, traducao);
+//                 adicionarAFavoritos(traducao);
+//                 break;
+//             }
+//             case 3: {
+//                 mostrarFavoritos();
+//                 cout << "Digite o número do favorito para remover: ";
+//                 int idx;
+//                 cin >> idx;
+//                 cin.ignore();
+//                 if (idx > 0 && idx <= favoritos.size()) {
+//                     favoritos.erase(favoritos.begin() + idx - 1);
+//                     salvarLista(FAVORITOS_ARQUIVO, favoritos);
+//                     cout << aplicarCor("Favorito removido!\n", "verde");
+//                 } else {
+//                     cout << "Índice inválido.\n";
+//                 }
+//                 break;
+//             }
+//             case 4:
+//                 break;
+//             default:
+//                 cout << "Opção inválida.\n";
+//         }
+//     } while (opcao != 4);
+// }
 
 void mostrarFavoritos() {
     vector<string> favoritos = carregarLista(FAVORITOS_ARQUIVO);
@@ -306,19 +460,36 @@ void mostrarFavoritos() {
     }
 }
 
+// void adicionarAFavoritos(const string& traducao) {
+//     vector<string> favoritos = carregarLista(FAVORITOS_ARQUIVO);
+//     favoritos.push_back(traducao);
+//     salvarLista(FAVORITOS_ARQUIVO, favoritos);
+//     cout << aplicarCor("Tradução adicionada aos favoritos!\n", "verde");
+// }
+
 void adicionarAFavoritos(const string& traducao) {
-    vector<string> favoritos = carregarLista(FAVORITOS_ARQUIVO);
-    favoritos.push_back(traducao);
-    salvarLista(FAVORITOS_ARQUIVO, favoritos);
+    if (!db) return;
+    
+    // Extrair entrada e tradução da string
+    size_t pos = traducao.find('=');
+    if (pos == string::npos) return;
+    
+    string entrada = traducao.substr(0, pos);
+    string trad = traducao.substr(pos + 1);
+    
+    string sql = "INSERT INTO favoritos (entrada, traducao) VALUES ('" + 
+                 entrada + "', '" + trad + "');";
+
+    executarSQL(sql.c_str(), nullptr, nullptr);
     cout << aplicarCor("Tradução adicionada aos favoritos!\n", "verde");
 }
 
-void mostrarEstatisticas(const map<string, string>& dicionario, const vector<string>& historico) {
-    cout << "\n=== Estatísticas ===\n";
-    cout << "Total de traduções: " << dicionario.size() << "\n";
-    cout << "Total de traduções no histórico: " << historico.size() << "\n";
-    // Adicione mais estatísticas conforme necessário
-}
+// void mostrarEstatisticas(const map<string, string>& dicionario, const vector<string>& historico) {
+//     cout << "\n=== Estatísticas ===\n";
+//     cout << "Total de traduções: " << dicionario.size() << "\n";
+//     cout << "Total de traduções no histórico: " << historico.size() << "\n";
+//     // Adicione mais estatísticas conforme necessário
+// }
 
 void buscarExpressoes(const map<string, string>& dicionario) {
     cout << "Digite a expressão para buscar: ";
@@ -339,15 +510,15 @@ void buscarExpressoes(const map<string, string>& dicionario) {
     }
 }
 
-void limparHistorico() {
-    ofstream arquivo(HISTORICO_ARQUIVO, ios::trunc);
-    if (arquivo.is_open()) {
-        arquivo.close();
-        cout << aplicarCor("Histórico limpo com sucesso!\n", "verde");
-    } else {
-        cerr << aplicarCor("Erro ao limpar histórico.\n", "vermelho");
-    }
-}
+// void limparHistorico() {
+//     ofstream arquivo(HISTORICO_ARQUIVO, ios::trunc);
+//     if (arquivo.is_open()) {
+//         arquivo.close();
+//         cout << aplicarCor("Histórico limpo com sucesso!\n", "verde");
+//     } else {
+//         cerr << aplicarCor("Erro ao limpar histórico.\n", "vermelho");
+//     }
+// }
 
 string traduzirTexto(const string& texto, const map<string, string>& dicionario, bool isFrase) {
     try {
@@ -547,4 +718,11 @@ void salvarDicionario(const std::map<std::string, std::string>& dicionario, bool
         }
     }
     arquivo.close();
+}
+
+void fecharBancoDados() {
+    if (db) {
+        sqlite3_close(db);
+        db = nullptr;
+    }
 }

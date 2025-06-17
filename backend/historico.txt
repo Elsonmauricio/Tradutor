@@ -19,3 +19,5 @@ bom dia familia=[bom] [dia] [familia]
 bom dia familia=[bom] [dia] [familia]
 bom dia família=[bom] [dia] ovandu
 sábado amigo=ocasapalo munu
+dois=vali
+dois=vali
