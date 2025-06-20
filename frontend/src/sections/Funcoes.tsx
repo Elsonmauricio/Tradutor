@@ -56,15 +56,7 @@ const Funcoes = () => {
         </p>
       </section>
 
-      <section>
-        <h2 className="text-xl font-semibold mb-2 text-indigo-600">Dicas Gerais</h2>
-        <ul className="list-disc ml-6">
-          <li>Certifique-se de que o backend está rodando antes de usar o frontend.</li>
-          <li>Se aparecer erro de rede, verifique se o backend está ativo e ouvindo na porta correta.</li>
-          <li>Use os favoritos para guardar traduções importantes.</li>
-          <li>Mantenha o dicionário atualizado para melhores resultados.</li>
-        </ul>
-      </section>
+  
     </div>
   );
 };

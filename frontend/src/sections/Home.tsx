@@ -15,7 +15,7 @@ export default function LandingPage() {
 
       <main className="flex flex-1 flex-col items-center justify-center text-center px-4">
         <h2 className="text-4xl sm:text-5xl font-extrabold text-gray-800 mb-6">
-          Quebrando barreiras linguística com tecnologia
+          Quebrando a barreira linguística com o Umbundo
         </h2>
         <p className="text-lg text-gray-600 mb-8 max-w-xl">
           Plataforma de Intervenção e Auxílio de Língua que conecta pessoas e culturas com traduções em tempo real e suporte a língua africana.
